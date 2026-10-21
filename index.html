@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Universal Blockbuster: The Daily Movie Cast Puzzle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64x64.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="favicon-512x512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="theme-color" content="#1b0f3b">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --gold:#ffc83d;--pink:#ff4f9a;--cyan:#33d6ff;--blood:#8e1c24;--navy:#1b0f3b;--bg2:#2b1166;--bg3:#0d3b7a;--panel:rgba(20,10,48,.72);
+    --white:#fff;--green:#22c97a;--red:#ff5a5a;--muted:#c9c3e6;--line:rgba(255,255,255,.2);
+    --bs:min(92vw,540px);           /* board size */
+  }
+  *{box-sizing:border-box}
+  html{background:var(--navy)}
+  html,body{width:100%;height:100%;margin:0;position:relative;overflow:hidden;color:var(--white);
+    font-family:'Open Sans',Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  button,a{font:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  button:focus-visible,a:focus-visible{outline:4px solid var(--gold);outline-offset:4px}
+
+  /* ---------- Background video (anti-flicker: own layer, no filters) ---------- */
+  #bg{position:fixed;inset:0;z-index:-4;pointer-events:none;
+    background:radial-gradient(circle at 15% 20%,rgba(255,79,154,.35),transparent 45%),
+               radial-gradient(circle at 85% 75%,rgba(51,214,255,.30),transparent 50%),
+               linear-gradient(135deg,var(--navy),var(--bg2) 55%,var(--bg3))}
+  /* Soft colour spots: radial gradients (no blur filter) so they never flicker */
+  .spot{position:fixed;width:80vmax;height:80vmax;border-radius:50%;z-index:-3;opacity:.4;pointer-events:none;
+    will-change:transform;transform:translateZ(0);animation:drift 18s ease-in-out infinite alternate}
+  .spot.a{background:radial-gradient(circle,rgba(255,79,154,.55),transparent 65%);top:-40vmax;left:-30vmax}
+  .spot.b{background:radial-gradient(circle,rgba(51,214,255,.5),transparent 65%);bottom:-40vmax;right:-30vmax;animation-delay:-9s}
+  @keyframes drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(10vmax,8vmax,0)}}
+  #bgVideo{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;z-index:-2;
+    transform:translateZ(0);-webkit-transform:translateZ(0);backface-visibility:hidden;pointer-events:none}
+  #bgVideo.failed{display:none}
+  #bgOverlay{position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:linear-gradient(180deg,rgba(27,15,59,0),rgba(27,15,59,.35))}
+
+  /* ---------- Screens ---------- */
+  .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right))
+            max(56px,calc(env(safe-area-inset-bottom) + 38px)) max(24px,env(safe-area-inset-left));
+    transition:transform .65s cubic-bezier(.22,.8,.25,1),opacity .45s,visibility 0s;
+    overflow:auto;-webkit-overflow-scrolling:touch;overflow-anchor:none;scroll-behavior:auto}
+  .hidden-left,.hidden-right{opacity:0;pointer-events:none;visibility:hidden;
+    transition:transform .65s cubic-bezier(.22,.8,.25,1),opacity .45s,visibility 0s linear .65s}
+  .hidden-left{transform:translateX(-105%)}
+  .hidden-right{transform:translateX(105%)}
+
+  /* ---------- Landing ---------- */
+  .landing-content{width:min(940px,100%);text-align:center;margin:auto}
+  .logo{display:block;max-width:min(520px,75vw);max-height:10vh;margin:0 auto clamp(4px,1vh,12px);object-fit:contain}
+  .small-logo{display:block;max-width:min(200px,42vw);max-height:10vh;margin:0 auto;object-fit:contain}
+  .brand{font-size:clamp(34px,6.4vw,82px);line-height:1;margin:0 0 10px;font-weight:800;
+    letter-spacing:.02em;text-transform:uppercase;
+    background:linear-gradient(90deg,var(--gold),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand .of{display:block;font-size:.3em;letter-spacing:.36em;color:var(--cyan);-webkit-text-fill-color:var(--cyan);margin:14px 0 0;font-weight:700}
+  .datestamp{color:var(--muted);letter-spacing:.24em;text-transform:uppercase;font-size:clamp(11px,1.6vw,15px);margin:22px 0 0}
+  .rule{width:min(420px,70%);height:2px;background:linear-gradient(90deg,transparent,var(--pink),var(--gold),var(--cyan),transparent);margin:20px auto}
+  .tagline{color:#e9e4ff;font-size:clamp(15px,2vw,20px);max-width:660px;margin:0 auto 26px;line-height:1.5}
+  .how{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;width:min(820px,100%);margin:0 auto 26px}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:min(560px,100%);margin:0 auto 30px}
+  .stat{padding:14px 8px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+  .stat b{display:block;font-size:clamp(26px,4.6vw,40px);color:var(--gold);line-height:1.1}
+  .stat span{display:block;font-size:clamp(10px,1.4vw,12px);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+  .landing-actions{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .landing-row{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+  .landing-row .btn{min-width:min(170px,40vw)}
+
+  /* ---------- Buttons ---------- */
+  .btn{min-height:56px;padding:14px 26px;border:2px solid var(--line);border-radius:14px;color:#fff;
+    background:rgba(30,16,70,.8);font-weight:800;cursor:pointer;letter-spacing:.04em;
+    transition:transform .18s,background .18s,border-color .18s}
+  .btn:hover:not(:disabled),.btn:focus-visible{transform:scale(1.04);border-color:var(--gold);background:rgba(60,30,120,.9)}
+  .btn.primary{background:linear-gradient(90deg,var(--gold),#ff9f3d);color:#2a1300;border-color:#ffe39a}
+  .btn.primary:hover:not(:disabled),.btn.primary:focus-visible{background:linear-gradient(90deg,#ffd76a,#ffb15e)}
+  .btn.ghost{min-height:48px;padding:10px 22px;font-size:clamp(13px,1.6vw,15px);background:rgba(255,79,154,.18);border-color:rgba(255,79,154,.6)}
+  .btn.sm{min-height:46px;padding:8px 14px;font-size:clamp(12.5px,1.5vw,14px)}
+  .btn:disabled{opacity:.45;cursor:default;transform:none}
+  .btn-lg{font-size:clamp(17px,2.2vw,22px);min-width:min(300px,80vw);text-transform:uppercase}
+
+  /* ---------- Rule chips (Meowdoku-style) ---------- */
+  .chiprule{display:flex;align-items:center;justify-content:center;text-align:center;padding:10px 10px;
+    border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,200,61,.3);
+    color:#ffe7a8;font-size:clamp(11.5px,1.45vw,14px);line-height:1.35;font-weight:600}
+
+  /* ---------- Game ---------- */
+  #game{align-items:flex-start}
+  .wrap{width:min(1080px,100%);margin:auto;display:flex;flex-direction:column;gap:clamp(12px,2vh,20px)}
+  .top{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
+  .day-no{letter-spacing:.24em;text-transform:uppercase;font-size:clamp(10px,1.4vw,13px);color:var(--cyan);font-weight:800}
+  .title{font-size:clamp(24px,3.4vw,40px);margin:4px 0 0;line-height:1.05;font-weight:800;text-transform:uppercase;
+    background:linear-gradient(90deg,var(--gold),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .timer{font-variant-numeric:tabular-nums;color:var(--muted);letter-spacing:.14em;font-size:clamp(13px,1.7vw,16px);font-weight:700}
+  .archive-flag{display:none;padding:10px 16px;border-radius:12px;background:rgba(255,200,61,.12);
+    border:1px solid rgba(255,200,61,.35);font-size:clamp(12px,1.6vw,15px);font-weight:700;color:#ffe7a8}
+  .archive-flag.on{display:block}
+  .rules{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .play{display:flex;flex-direction:column;align-items:center;gap:18px}
+  .side{width:var(--bs);display:flex;flex-direction:column;gap:14px}
+
+  /* Board */
+  .board{width:var(--bs);height:var(--bs);background:#fbf8f3;border-radius:18px;padding:calc(var(--bs)*.03);
+    display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);gap:calc(var(--bs)*.016);
+    box-shadow:0 20px 60px rgba(0,0,0,.35),0 0 0 4px rgba(255,200,61,.35)}
+  .cell{position:relative;border:0;padding:0;margin:0;border-radius:calc(var(--bs)*.022);cursor:pointer;
+    display:grid;place-items:center;min-width:0;min-height:0;transition:filter .15s,transform .15s}
+  .board.placing .cell:hover:not(:disabled){filter:brightness(1.08)}
+  .cell:focus-visible{outline:4px solid var(--bg2);outline-offset:-4px}
+  .cell:disabled{cursor:default}
+  .tok{width:74%;height:74%;border-radius:50%;background:var(--bg2);color:#fff;border:3px solid var(--gold);
+    display:grid;place-items:center;font-weight:800;font-size:calc(var(--bs)*.05);letter-spacing:.02em;
+    box-shadow:0 4px 10px rgba(0,0,0,.35);animation:pop .22s ease-out}
+  .tok.hint{background:var(--gold);color:#2a1300;border-color:#fff}
+  .cell.bad .tok{background:var(--red);border-color:#ffc2bd;color:#fff}
+  .cell.win .tok{border-color:#9ff5cb}
+  .xm{font-size:calc(var(--bs)*.06);color:rgba(42,19,0,.5);font-weight:800;line-height:1}
+  @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+
+  /* Region colours + patterns (patterns help colour-blind players) */
+  .c0{background-color:#E3B941}
+  .c1{background-color:#E5A7C1}
+  .c2{background-color:#9079D4}
+  .c3{background-color:#4FB7A6}
+  .c4{background-color:#EE8B5B}
+  .c1{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.22) 0 4px,transparent 4px 12px)}
+  .c2{background-image:radial-gradient(rgba(255,255,255,.28) 18%,transparent 20%);background-size:12px 12px}
+  .c3{background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.22) 0 3px,transparent 3px 11px)}
+  .c4{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.2) 0 3px,transparent 3px 12px),
+                       repeating-linear-gradient(-45deg,rgba(255,255,255,.2) 0 3px,transparent 3px 12px)}
+
+  /* Legend */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:clamp(14px,2vw,20px)}
+  .panel h3{margin:0 0 12px;font-size:clamp(11px,1.4vw,13px);letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:800}
+  .legend{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+  .legend li{display:flex;align-items:center;gap:12px;font-size:clamp(14px,1.75vw,17px);line-height:1.3}
+  .sw{flex:0 0 auto;width:26px;height:26px;border-radius:7px}
+  .legend small{color:var(--muted);font-size:.82em}
+
+  /* Actor tray */
+  .tray{display:grid;grid-template-columns:1fr;gap:9px}
+  .actor{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:8px 12px;min-height:54px;
+    border:2px solid var(--line);border-radius:14px;background:rgba(30,16,70,.85);color:#fff;cursor:pointer;
+    transition:transform .15s,border-color .15s,background .15s}
+  .actor:hover:not(:disabled),.actor:focus-visible{border-color:var(--gold);background:rgba(60,30,120,.9)}
+  .actor.sel{border-color:var(--gold);background:rgba(255,200,61,.22);box-shadow:0 0 0 2px var(--gold) inset}
+  .actor.placed{opacity:.6}
+  .actor.bad{border-color:#e0616a}
+  .actor:disabled{cursor:default}
+  .av{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:var(--bg2);border:2px solid var(--gold);
+    display:grid;place-items:center;font-weight:800;font-size:14px}
+  .actor.sel .av{background:var(--gold);color:#2a1300}
+  .nm{flex:1 1 auto;font-weight:700;font-size:clamp(14px,1.75vw,17px);min-width:0}
+  .where{flex:0 0 auto;width:20px;height:20px;border-radius:6px;display:none}
+  .actor.placed .where{display:block}
+  .key{flex:0 0 auto;color:var(--muted);font-size:12px;font-weight:700}
+  .tip{color:var(--muted);font-size:clamp(12.5px,1.55vw,14.5px);line-height:1.45;margin:0;text-align:center}
+  .controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .msg{min-height:1.4em;text-align:center;font-weight:700;font-size:clamp(13.5px,1.7vw,16px);color:#ffb3ad;margin:0}
+  .msg.good{color:#9ff5cb}
+
+  /* ---------- Solution ---------- */
+  .solution{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:clamp(20px,3vw,32px);animation:cardIn .5s forwards}
+  @keyframes cardIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+  .verdict-line{font-size:clamp(28px,4.6vw,56px);font-weight:900;margin:0 0 6px;line-height:1.1;
+    background:linear-gradient(90deg,var(--gold),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(16px,2.1vw,22px);margin:0 0 18px;color:var(--gold);font-weight:800}
+  .solution h4{margin:18px 0 10px;font-size:clamp(11px,1.5vw,13px);letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+  .cast{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+  .cast li{display:flex;gap:12px;align-items:flex-start;font-size:clamp(14px,1.8vw,17px);line-height:1.45;color:#f1edff}
+  .cast .sw{width:20px;height:20px;margin-top:3px}
+  .cast em{color:var(--muted);display:block;font-size:.9em}
+  .streak-banner{display:flex;align-items:center;justify-content:center;gap:10px;margin:22px 0 0;padding:16px;border-radius:14px;
+    background:rgba(255,200,61,.12);border:1px solid rgba(255,200,61,.35);font-weight:800;font-size:clamp(15px,2vw,20px);flex-wrap:wrap;text-align:center}
+  .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(14px,2.4vw,24px);margin-top:24px}
+  .next-in{text-align:center;color:var(--muted);margin-top:22px;letter-spacing:.16em;text-transform:uppercase;
+    font-size:clamp(10.5px,1.4vw,13px);font-variant-numeric:tabular-nums}
+
+  /* ---------- Archive ---------- */
+  #archive{align-items:flex-start}
+  .archive-wrap{width:min(1180px,100%);margin:auto;display:flex;flex-direction:column;gap:clamp(14px,2.2vh,22px)}
+  .archive-head{text-align:center}
+  .archive-head h2{font-size:clamp(26px,4vw,46px);margin:0 0 8px;font-weight:800;text-transform:uppercase}
+  .archive-head p{color:var(--muted);margin:0;font-size:clamp(13px,1.7vw,16px)}
+  .archive-stats{display:flex;justify-content:center;gap:clamp(14px,3vw,34px);flex-wrap:wrap;padding:14px 0;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .archive-stats div{text-align:center}
+  .archive-stats b{display:block;color:var(--gold);font-size:clamp(20px,3vw,30px);line-height:1.2}
+  .archive-stats span{font-size:clamp(9.5px,1.3vw,11.5px);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+  .archive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+  .day-card{position:relative;text-align:left;padding:16px 16px 50px;border:2px solid var(--line);border-radius:16px;
+    background:rgba(30,16,70,.85);color:#fff;cursor:pointer;min-height:130px;transition:transform .18s,background .18s,border-color .18s}
+  .day-card:hover,.day-card:focus-visible{transform:scale(1.02);border-color:var(--gold);background:rgba(60,30,120,.9)}
+  .day-card.is-today{border-color:rgba(255,200,61,.7)}
+  .dc-no{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);font-weight:800}
+  .dc-sw{display:flex;gap:6px;margin:10px 0 8px}
+  .dc-sw span{width:20px;height:20px;border-radius:5px}
+  .dc-films{display:block;color:var(--muted);font-size:clamp(12px,1.45vw,13.5px);line-height:1.4}
+  .dc-status{position:absolute;left:16px;bottom:14px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;padding:5px 11px;border-radius:999px}
+  .dc-status.solved{background:rgba(31,157,94,.25);color:#9ff5cb;border:1px solid rgba(31,157,94,.6)}
+  .dc-status.progress{background:rgba(255,200,61,.18);color:#ffe7a8;border:1px solid rgba(255,200,61,.5)}
+  .dc-status.unplayed{background:rgba(255,255,255,.1);color:#e9e4ff;border:1px solid var(--line)}
+  .dc-status.today{background:var(--gold);color:#2a1300;border:1px solid #ffe39a}
+  .archive-foot{display:flex;justify-content:center;padding-bottom:clamp(14px,2.5vh,26px)}
+
+  /* ---------- Footer / loader ---------- */
+  #copyright{position:fixed;left:0;right:0;bottom:0;z-index:6;text-align:center;font-size:clamp(10px,1.3vw,13px);
+    color:rgba(255,255,255,.7);padding:8px 12px calc(env(safe-area-inset-bottom) + 8px);pointer-events:none;text-shadow:0 1px 4px #000}
+  #loader{position:fixed;inset:0;display:grid;place-items:center;align-content:center;gap:26px;background:var(--navy);z-index:9999;
+    transition:opacity .5s ease;padding:24px;text-align:center}
+  #loader.hide{opacity:0;pointer-events:none;visibility:hidden;transition:opacity .5s ease,visibility 0s linear .5s}
+  .spinner{position:relative;width:clamp(110px,18vw,160px);height:clamp(110px,18vw,160px);display:grid;place-items:center}
+  .spinner .ring{position:absolute;inset:0;border-radius:50%;border:5px solid rgba(255,200,61,.18);border-top-color:var(--gold);border-right-color:var(--pink);animation:spin 1s linear infinite}
+  .spinner img{width:62%;height:62%;object-fit:contain;animation:pulse 1.6s ease-in-out infinite}
+  .loading-text{font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);font-size:clamp(11px,1.5vw,14px)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes pulse{0%,100%{transform:scale(.9);opacity:.8}50%{transform:scale(1);opacity:1}}
+
+  /* ---------- Responsive ---------- */
+  @media(min-width:960px){
+    :root{--bs:min(540px,64vh,52vw)}
+    .play{flex-direction:row;align-items:flex-start;justify-content:center;gap:28px}
+    .side{width:min(380px,34vw)}
+  }
+  /* ---------- Drag & drop / swipe-to-mark ---------- */
+  .board,.tray{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  .cell,.actor{touch-action:none}
+  .actor:not(:disabled){cursor:grab}
+  .actor.dragging{opacity:.35}
+  .cell.drop-target{filter:brightness(1.12);box-shadow:inset 0 0 0 4px #fff}
+  .cell.drop-target.drop-bad{box-shadow:inset 0 0 0 4px var(--red)}
+  .tok.lifted{opacity:.3}
+  .drag-ghost{position:fixed;left:0;top:0;z-index:10000;pointer-events:none;width:clamp(52px,12vw,76px);height:clamp(52px,12vw,76px);
+    border-radius:50%;background:var(--bg2);color:#fff;border:3px solid var(--gold);display:grid;place-items:center;
+    font-weight:800;font-size:clamp(16px,3.6vw,24px);box-shadow:0 12px 30px rgba(0,0,0,.5);will-change:transform}
+  body.is-dragging,body.is-dragging *{cursor:grabbing!important}
+
+  /* Mobile / tablet portrait: movie key above the grid, cast straight below it */
+  @media(max-width:959px){
+    .play{gap:12px}
+    .side{display:contents}
+    .play > .board{order:2}
+    .legend-panel{order:1;width:var(--bs);padding:10px 12px}
+    .legend-panel h3{margin:0 0 8px}
+    .legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+    .legend li{font-size:13px;gap:8px;min-width:0}
+    .legend li span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .legend .sw{width:18px;height:18px;border-radius:5px}
+    .cast-panel{order:3;width:var(--bs);padding:10px 12px}
+    .cast-panel h3{margin:0 0 8px}
+    .tray{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+    .actor{min-height:46px;padding:6px 8px;gap:8px}
+    .av{width:32px;height:32px;font-size:12px}
+    .nm{font-size:13.5px;line-height:1.2}
+    .side > .tip,.side > .msg,.side > .controls{order:4;width:var(--bs)}
+    .side > .msg{order:4}
+    .side > .controls{order:5}
+    .side > .tip{order:6}
+  }
+  @media(max-width:760px){
+    .rules,.how{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .actions{grid-template-columns:1fr}
+    .screen{padding:18px 14px 52px}
+    .archive-grid{grid-template-columns:1fr}
+    .tok{border-width:2px}
+    .key{display:none}
+  }
+  @media(max-width:380px){ .controls{grid-template-columns:1fr 1fr} .controls .btn:last-child{grid-column:span 2} }
+  @media(min-width:1600px){
+    :root{--bs:min(760px,64vh)}
+    .screen{padding:5vh 7vw 7vh}
+    .btn{min-height:68px}
+    .side{width:min(520px,30vw)}
+    .actor{min-height:66px}
+    .av{width:46px;height:46px;font-size:17px}
+  }
+  @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<video id="bgVideo" autoplay muted loop playsinline preload="auto" disablepictureinpicture>
+  <source src="cinema.mp4" type="video/mp4">
+</video>
+<div id="bgOverlay"></div>
+<div id="bg"></div>
+<div class="spot a"></div><div class="spot b"></div>
+
+<div id="loader" role="status" aria-live="polite" aria-label="Loading">
+  <div class="spinner"><div class="ring"></div><img src="logo_white.png" alt=""></div>
+  <div class="loading-text">Casting today&rsquo;s puzzle&hellip;</div>
+</div>
+
+<!-- ============ LANDING ============ -->
+<section id="landing" class="screen">
+  <main class="landing-content">
+    <img class="logo" src="logo_white.png" alt="Logo">
+    <h1 class="brand">Universal Blockbuster<span class="of">the daily movie cast puzzle</span></h1>
+    <div class="rule"></div>
+    <p class="datestamp" id="landingDate"></p>
+    <p class="tagline" id="landingTag">Five movies. Five actors. Put every star in their place.</p>
+    <div class="how">
+      <div class="chiprule">1 actor in each movie colour</div>
+      <div class="chiprule">1 actor in every row and column</div>
+      <div class="chiprule">Actors can&rsquo;t touch, even diagonally</div>
+      <div class="chiprule">Each actor must have starred in that movie</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="statStreak">0</b><span>Streak</span></div>
+      <div class="stat"><b id="statBest">0</b><span>Best</span></div>
+      <div class="stat"><b id="statSolved">0</b><span>Solved</span></div>
+    </div>
+    <div class="landing-actions">
+      <button id="startBtn" class="btn primary btn-lg" type="button">Play today</button>
+      <div class="landing-row">
+        <button id="landingArchiveBtn" class="btn ghost" type="button">Previous days</button>
+        <button id="landingShareBtn" class="btn ghost" type="button">Share</button>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="screen hidden-right">
+  <main class="wrap">
+    <img class="small-logo" src="logo_white.png" alt="Logo">
+    <div class="archive-flag" id="archiveFlag"></div>
+    <header class="top">
+      <div>
+        <div class="day-no" id="dayNo"></div>
+        <h2 class="title">Universal Blockbuster</h2>
+      </div>
+      <div class="timer" id="timer">0:00</div>
+    </header>
+    <div class="rules">
+      <div class="chiprule">1 actor in each movie colour</div>
+      <div class="chiprule">1 actor in every row and column</div>
+      <div class="chiprule">Actors can&rsquo;t touch, even diagonally</div>
+      <div class="chiprule">Each actor must have starred in that movie</div>
+    </div>
+    <div class="play">
+      <div class="board" id="board" role="grid" aria-label="Puzzle grid"></div>
+      <div class="side">
+        <section class="panel legend-panel"><h3>Today&rsquo;s movies</h3><ul class="legend" id="legend"></ul></section>
+        <section class="panel cast-panel"><h3>The cast</h3><div class="tray" id="tray"></div></section>
+        <p class="tip">Drag an actor onto a square, or tap an actor then tap a square. Drag a placed actor to move them, or off the grid to remove them. With no actor picked, tap or drag across empty squares to mark them &#10005;.</p>
+        <p class="msg" id="msg" aria-live="polite"></p>
+        <div class="controls">
+          <button id="hintBtn" class="btn sm" type="button">Hint</button>
+          <button id="resetBtn" class="btn sm" type="button">Clear</button>
+          <button id="gameHomeBtn" class="btn sm" type="button">Home</button>
+        </div>
+      </div>
+    </div>
+    <div id="solutionSlot"></div>
+  </main>
+</section>
+
+<!-- ============ ARCHIVE ============ -->
+<section id="archive" class="screen hidden-right">
+  <main class="archive-wrap">
+    <img class="small-logo" src="logo_white.png" alt="Logo">
+    <div class="archive-head">
+      <h2>Previous Days</h2>
+      <p>Every puzzle since day one. Catch up on the ones you missed.</p>
+    </div>
+    <div class="archive-stats">
+      <div><b id="arcSolved">0</b><span>Solved</span></div>
+      <div><b id="arcProgress">0</b><span>In progress</span></div>
+      <div><b id="arcOpen">0</b><span>Unplayed</span></div>
+    </div>
+    <div class="archive-grid" id="archiveGrid"></div>
+    <div class="archive-foot"><button id="arcHomeBtn" class="btn" type="button">Back home</button></div>
+  </main>
+</section>
+
+<footer id="copyright">&copy; <span id="year"></span> NBCUniversal &middot; A new cast every day</footer>
+
+<script>
+/* ======================================================================
+   Universal Blockbuster - fully self-contained. No external data file needed.
+   Each day's puzzle is generated from the date with a seeded random
+   generator, so every player gets the same grid on the same day.
+   NOTE: editing the MOVIES list changes the puzzles for every day,
+   including past days. Only append to the end if you want to minimise this.
+   ====================================================================== */
+const START_DATE = '2026-10-01';      // day 1
+const STORE_KEY  = 'Universal Blockbuster.v1';
+
+/* ==PURE-START== */
+/* [title, year, studio, [lead cast]] - please verify before launch */
+const MOVIES = [
+  ['Jurassic Park',1993,'Universal',['Sam Neill','Laura Dern','Jeff Goldblum','Richard Attenborough']],
+  ['Jurassic World',2015,'Universal',['Chris Pratt','Bryce Dallas Howard','Vincent D\'Onofrio']],
+  ['Jurassic World Dominion',2022,'Universal',['Chris Pratt','Bryce Dallas Howard','Sam Neill','Laura Dern','Jeff Goldblum']],
+  ['Oppenheimer',2023,'Universal',['Cillian Murphy','Emily Blunt','Matt Damon','Robert Downey Jr.','Florence Pugh','Gary Oldman']],
+  ['The Bourne Identity',2002,'Universal',['Matt Damon','Franka Potente','Chris Cooper']],
+  ['The Fall Guy',2024,'Universal',['Ryan Gosling','Emily Blunt','Aaron Taylor-Johnson']],
+  ['Jaws',1975,'Universal',['Roy Scheider','Robert Shaw','Richard Dreyfuss']],
+  ['Back to the Future',1985,'Universal',['Michael J. Fox','Christopher Lloyd','Lea Thompson']],
+  ['E.T. the Extra-Terrestrial',1982,'Universal',['Henry Thomas','Drew Barrymore','Dee Wallace']],
+  ['The Fast and the Furious',2001,'Universal',['Vin Diesel','Paul Walker','Michelle Rodriguez','Jordana Brewster']],
+  ['Fast Five',2011,'Universal',['Vin Diesel','Paul Walker','Dwayne Johnson','Jordana Brewster']],
+  ['Bridesmaids',2011,'Universal',['Kristen Wiig','Maya Rudolph','Melissa McCarthy','Rose Byrne']],
+  ['Mamma Mia!',2008,'Universal',['Meryl Streep','Amanda Seyfried','Pierce Brosnan','Colin Firth']],
+  ['Mamma Mia! Here We Go Again',2018,'Universal',['Lily James','Amanda Seyfried','Meryl Streep','Colin Firth','Pierce Brosnan','Cher']],
+  ['Notting Hill',1999,'Universal',['Julia Roberts','Hugh Grant','Rhys Ifans']],
+  ['Love Actually',2003,'Universal',['Hugh Grant','Colin Firth','Emma Thompson','Keira Knightley','Liam Neeson','Alan Rickman','Bill Nighy']],
+  ['Bridget Jones\'s Diary',2001,'Universal',['Ren\u00e9e Zellweger','Colin Firth','Hugh Grant']],
+  ['Nanny McPhee',2005,'Universal',['Emma Thompson','Colin Firth']],
+  ['Erin Brockovich',2000,'Universal',['Julia Roberts','Albert Finney','Aaron Eckhart']],
+  ['Wicked',2024,'Universal',['Cynthia Erivo','Ariana Grande','Jonathan Bailey','Michelle Yeoh','Jeff Goldblum']],
+  ['Les Mis\u00e9rables',2012,'Universal',['Hugh Jackman','Russell Crowe','Anne Hathaway','Amanda Seyfried','Eddie Redmayne']],
+  ['Gladiator',2000,'Universal / DreamWorks',['Russell Crowe','Joaquin Phoenix','Connie Nielsen']],
+  ['A Beautiful Mind',2001,'Universal / DreamWorks',['Russell Crowe','Jennifer Connelly','Ed Harris']],
+  ['Meet the Parents',2000,'Universal / DreamWorks',['Ben Stiller','Robert De Niro','Teri Polo','Owen Wilson']],
+  ['Pitch Perfect',2012,'Universal',['Anna Kendrick','Rebel Wilson','Brittany Snow']],
+  ['The Mummy',1999,'Universal',['Brendan Fraser','Rachel Weisz']],
+  ['The 40-Year-Old Virgin',2005,'Universal',['Steve Carell','Paul Rudd','Seth Rogen','Catherine Keener']],
+  ['Knocked Up',2007,'Universal',['Seth Rogen','Katherine Heigl','Paul Rudd','Leslie Mann']],
+  ['Ted',2012,'Universal',['Mark Wahlberg','Mila Kunis','Seth MacFarlane']],
+  ['Twisters',2024,'Universal',['Daisy Edgar-Jones','Glen Powell','Anthony Ramos']],
+  ['Nobody',2021,'Universal',['Bob Odenkirk','Christopher Lloyd','Connie Nielsen']],
+  ['Get Out',2017,'Universal / Blumhouse',['Daniel Kaluuya','Allison Williams','Catherine Keener','Bradley Whitford']],
+  ['Us',2019,'Universal',['Lupita Nyong\'o','Winston Duke','Elisabeth Moss']],
+  ['Nope',2022,'Universal',['Daniel Kaluuya','Keke Palmer','Steven Yeun']],
+  ['The Invisible Man',2020,'Universal / Blumhouse',['Elisabeth Moss','Oliver Jackson-Cohen']],
+  ['Split',2016,'Universal / Blumhouse',['James McAvoy','Anya Taylor-Joy','Betty Buckley']],
+  ['Glass',2019,'Universal / Blumhouse',['James McAvoy','Bruce Willis','Samuel L. Jackson','Anya Taylor-Joy']],
+  ['M3GAN',2022,'Universal / Blumhouse',['Allison Williams','Violet McGraw']],
+  ['Halloween',2018,'Universal / Blumhouse',['Jamie Lee Curtis','Judy Greer','Andi Matichak']],
+  ['The Black Phone',2021,'Universal / Blumhouse',['Ethan Hawke','Mason Thames','Madeleine McGraw']],
+  ['Sinister',2012,'Blumhouse',['Ethan Hawke','Juliet Rylance']],
+  ['The Purge',2013,'Universal / Blumhouse',['Ethan Hawke','Lena Headey']],
+  ['Five Nights at Freddy\'s',2023,'Universal / Blumhouse',['Josh Hutcherson','Matthew Lillard','Elizabeth Lail']],
+  ['Despicable Me',2010,'Illumination',['Steve Carell','Jason Segel','Russell Brand','Kristen Wiig']],
+  ['Despicable Me 2',2013,'Illumination',['Steve Carell','Kristen Wiig','Benjamin Bratt']],
+  ['Minions',2015,'Illumination',['Sandra Bullock','Jon Hamm','Michael Keaton']],
+  ['The Secret Life of Pets',2016,'Illumination',['Kevin Hart','Eric Stonestreet','Jenny Slate']],
+  ['Sing',2016,'Illumination',['Matthew McConaughey','Reese Witherspoon','Scarlett Johansson','Taron Egerton','Seth MacFarlane']],
+  ['The Super Mario Bros. Movie',2023,'Illumination',['Chris Pratt','Anya Taylor-Joy','Jack Black','Charlie Day','Seth Rogen']],
+  ['The Grinch',2018,'Illumination',['Benedict Cumberbatch','Rashida Jones','Kenan Thompson']],
+  ['Shrek',2001,'DreamWorks Animation',['Mike Myers','Eddie Murphy','Cameron Diaz','John Lithgow']],
+  ['Shrek 2',2004,'DreamWorks Animation',['Mike Myers','Eddie Murphy','Cameron Diaz','Antonio Banderas','Julie Andrews']],
+  ['Puss in Boots',2011,'DreamWorks Animation',['Antonio Banderas','Salma Hayek','Zach Galifianakis']],
+  ['Kung Fu Panda',2008,'DreamWorks Animation',['Jack Black','Angelina Jolie','Dustin Hoffman','Seth Rogen','Jackie Chan']],
+  ['Madagascar',2005,'DreamWorks Animation',['Ben Stiller','Chris Rock','David Schwimmer','Jada Pinkett Smith']],
+  ['How to Train Your Dragon',2010,'DreamWorks Animation',['Jay Baruchel','America Ferrera','Gerard Butler','Jonah Hill','Kristen Wiig']],
+  ['Trolls',2016,'DreamWorks Animation',['Anna Kendrick','Justin Timberlake','Zooey Deschanel']],
+  ['The Wild Robot',2024,'DreamWorks Animation',['Lupita Nyong\'o','Pedro Pascal','Kit Connor']],
+  ['Lost in Translation',2003,'Focus Features',['Bill Murray','Scarlett Johansson']],
+  ['Moonrise Kingdom',2012,'Focus Features',['Bill Murray','Bruce Willis','Edward Norton','Frances McDormand']],
+  ['Asteroid City',2023,'Focus Features',['Jason Schwartzman','Scarlett Johansson','Tom Hanks']],
+  ['Atonement',2007,'Focus Features',['Keira Knightley','James McAvoy','Saoirse Ronan']],
+  ['Pride & Prejudice',2005,'Focus Features',['Keira Knightley','Matthew Macfadyen','Judi Dench','Rosamund Pike']],
+  ['Anna Karenina',2012,'Focus Features',['Keira Knightley','Jude Law','Aaron Taylor-Johnson']],
+  ['Brokeback Mountain',2005,'Focus Features',['Heath Ledger','Jake Gyllenhaal','Anne Hathaway','Michelle Williams']],
+  ['Eternal Sunshine of the Spotless Mind',2004,'Focus Features',['Jim Carrey','Kate Winslet','Kirsten Dunst']],
+  ['The Theory of Everything',2014,'Focus Features',['Eddie Redmayne','Felicity Jones']],
+  ['Dallas Buyers Club',2013,'Focus Features',['Matthew McConaughey','Jared Leto','Jennifer Garner']],
+  ['Tinker Tailor Soldier Spy',2011,'Focus Features',['Gary Oldman','Colin Firth','Benedict Cumberbatch','Tom Hardy']],
+  ['Darkest Hour',2017,'Focus Features',['Gary Oldman','Kristin Scott Thomas','Lily James']],
+  ['Emma.',2020,'Focus Features',['Anya Taylor-Joy','Johnny Flynn','Bill Nighy']],
+  ['Last Night in Soho',2021,'Focus Features',['Anya Taylor-Joy','Thomasin McKenzie','Matt Smith']],
+  ['Belfast',2021,'Focus Features',['Jude Hill','Caitr\u00edona Balfe','Jamie Dornan','Judi Dench','Ciar\u00e1n Hinds']],
+  ['Fifty Shades of Grey',2015,'Universal / Focus Features',['Dakota Johnson','Jamie Dornan']],
+  ['Nosferatu',2024,'Focus Features',['Lily-Rose Depp','Bill Skarsg\u00e5rd','Nicholas Hoult','Aaron Taylor-Johnson','Willem Dafoe']],
+  ['Conclave',2024,'Focus Features',['Ralph Fiennes','Stanley Tucci','Isabella Rossellini']],
+  ['The Holdovers',2023,'Focus Features',['Paul Giamatti','Da\'Vine Joy Randolph','Dominic Sessa']],
+  ['Coraline',2009,'Focus Features',['Dakota Fanning','Teri Hatcher']],
+  ['Kubo and the Two Strings',2016,'Focus Features',['Charlize Theron','Matthew McConaughey','Art Parkinson']]
+];
+
+const N = 5;
+/* All 5x5 placements: one per row/column, no diagonal touching (14 total) */
+const PERMS = (() => {
+  const out = [], p = [], used = [];
+  (function rec(){
+    if(p.length === N){ out.push(p.slice()); return; }
+    for(let c = 0; c < N; c++){
+      if(used[c]) continue;
+      if(p.length && Math.abs(p[p.length-1] - c) < 2) continue;
+      used[c] = 1; p.push(c); rec(); p.pop(); used[c] = 0;
+    }
+  })();
+  return out;
+})();
+
+function mulberry(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffle(arr, r){
+  for(let i = arr.length - 1; i > 0; i--){ const j = r() * (i + 1) | 0; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+  return arr;
+}
+const CAST_INDEX = (() => {
+  const m = {};
+  MOVIES.forEach((mv, i) => mv[3].forEach(a => { (m[a] = m[a] || []).push(i); }));
+  return m;
+})();
+
+/* Pick 5 movies, favouring ones that share actors (adds the overlap twist) */
+function pickMovies(r){
+  const set = [r() * MOVIES.length | 0];
+  let guard = 0;
+  while(set.length < N && guard++ < 400){
+    let cand = -1;
+    if(r() < 0.7){
+      const pool = [];
+      set.forEach(i => MOVIES[i][3].forEach(a => CAST_INDEX[a].forEach(j => {
+        if(set.indexOf(j) < 0 && pool.indexOf(j) < 0) pool.push(j);
+      })));
+      if(pool.length) cand = pool[r() * pool.length | 0];
+    }
+    if(cand < 0) cand = r() * MOVIES.length | 0;
+    if(set.indexOf(cand) < 0) set.push(cand);
+  }
+  return set;
+}
+/* One distinct actor per movie; prefers actors who appear in several of today's movies */
+function pickActors(r, set){
+  const inSet = a => set.filter(i => MOVIES[i][3].indexOf(a) >= 0).length;
+  const chosen = [], used = {};
+  const preferOverlap = r() < 0.75;
+  function rec(k){
+    if(k === N) return true;
+    let c = shuffle(MOVIES[set[k]][3].filter(a => !used[a]), r);
+    if(preferOverlap) c.sort((a, b) => inSet(b) - inSet(a));
+    for(const a of c){ used[a] = 1; chosen[k] = a; if(rec(k + 1)) return true; used[a] = 0; }
+    return false;
+  }
+  return rec(0) ? chosen.slice() : null;
+}
+/* Grow 5 contiguous colour regions out from the seed cells, with uneven sizes */
+function growRegions(r, seeds){
+  const own = new Array(N * N).fill(-1);
+  seeds.forEach((c, k) => { own[c] = k; });
+  const w = seeds.map(() => 0.25 + r() * 2.2);
+  let left = N * N - N;
+  while(left > 0){
+    const fr = seeds.map((_, k) => {
+      const s = [];
+      for(let c = 0; c < N * N; c++){
+        if(own[c] !== k) continue;
+        const R = c / N | 0, C = c % N;
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(d => {
+          const rr = R + d[0], cc = C + d[1];
+          if(rr >= 0 && rr < N && cc >= 0 && cc < N && own[rr * N + cc] < 0 && s.indexOf(rr * N + cc) < 0) s.push(rr * N + cc);
+        });
+      }
+      return s;
+    });
+    let tot = 0; fr.forEach((s, k) => { if(s.length) tot += w[k]; });
+    let x = r() * tot, k = -1;
+    for(let i = 0; i < N; i++){ if(!fr[i].length) continue; k = i; x -= w[i]; if(x <= 0) break; }
+    const cell = fr[k][r() * fr[k].length | 0];
+    own[cell] = k; left--;
+  }
+  return own;
+}
+/* Count full solutions: placement AND which actor goes where */
+function countSolutions(own, elig, limit){
+  let n = 0;
+  for(const p of PERMS){
+    const reg = p.map((c, row) => own[row * N + c]);
+    if(new Set(reg).size < N) continue;
+    const usedRow = [];
+    (function rec(a){
+      if(n > limit) return;
+      if(a === N){ n++; return; }
+      for(let row = 0; row < N; row++){
+        if(usedRow[row] || elig[a].indexOf(reg[row]) < 0) continue;
+        usedRow[row] = 1; rec(a + 1); usedRow[row] = 0;
+      }
+    })(0);
+    if(n > limit) break;
+  }
+  return n;
+}
+function buildPuzzle(day){
+  const r = mulberry((day * 2654435761) ^ 0x5EED1234);
+  let best = null;
+  for(let outer = 0; outer < 300; outer++){
+    const set = pickMovies(r);
+    if(set.length < N) continue;
+    const actors = pickActors(r, set);
+    if(!actors) continue;
+    const elig = actors.map(a => set.map((m, i) => MOVIES[m][3].indexOf(a) >= 0 ? i : -1).filter(i => i >= 0));
+    for(let inner = 0; inner < 30; inner++){
+      const perm = PERMS[r() * PERMS.length | 0];
+      const rows = shuffle([0,1,2,3,4], r);
+      const seeds = actors.map((_, k) => rows[k] * N + perm[rows[k]]);
+      const own = growRegions(r, seeds);
+      const n = countSolutions(own, elig, 3);
+      const cand = { n, set, actors, elig, seeds, own };
+      if(!best || n < best.n) best = cand;
+      if(n === 1) return finish(best, r, day);
+    }
+  }
+  return finish(best, r, day);
+}
+function finish(b, r, day){
+  const order = shuffle([0,1,2,3,4], r);      // tray order must not mirror colour order
+  return {
+    day,
+    unique: b.n === 1,
+    own: b.own,
+    movies: b.set.map(i => ({ t: MOVIES[i][0], y: MOVIES[i][1], s: MOVIES[i][2] })),
+    actors: order.map(k => ({ name: b.actors[k], films: b.elig[k] })),
+    solution: order.map(k => b.seeds[k])
+  };
+}
+/* ==PURE-END== */
+
+/* ---------- Helpers ---------- */
+const COLORS = ['#E3B941','#E5A7C1','#9079D4','#4FB7A6','#EE8B5B'];
+const EMOJI  = ['\u{1F7E8}','\u{1F7E5}','\u{1F7EA}','\u{1F7E9}','\u{1F7E7}'];
+const MS_DAY = 86400000;
+const $ = s => document.querySelector(s);
+const esc = str => String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const localMidnight = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+const parseISO = s => { const p = s.split('-').map(Number); return new Date(p[0], p[1]-1, p[2]).getTime(); };
+const toISO = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+const dayNumberFor = d => Math.round((localMidnight(d) - parseISO(START_DATE)) / MS_DAY) + 1;
+const dateForDay = n => { const b = new Date(parseISO(START_DATE)); return new Date(b.getFullYear(), b.getMonth(), b.getDate() + n - 1); };
+const isoForDay = n => toISO(dateForDay(n));
+const fmtTime = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2,'0');
+const longDate = d => d.toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+const cache = {};
+const puzzleForDay = n => cache[n] || (cache[n] = buildPuzzle(n));
+
+function initialsFor(names){
+  const base = names.map(n => {
+    const w = n.replace(/\b(Jr\.|Sr\.)/g,'').trim().split(/\s+/);
+    return { first: w[0], last: w[w.length - 1] };
+  });
+  let ini = base.map(b => (b.first[0] + b.last[0]).toUpperCase());
+  ini = ini.map((v, i) => ini.indexOf(v) !== ini.lastIndexOf(v)
+    ? (base[i].first[0] + base[i].last.slice(0, 2)).toUpperCase() : v);
+  return ini;
+}
+
+/* ---------- Storage ---------- */
+const blankStore = () => ({ results:{}, progress:{}, streak:0, best:0, solved:0, lastPlayedISO:null });
+function loadStore(){
+  try{ const raw = localStorage.getItem(STORE_KEY); return raw ? Object.assign(blankStore(), JSON.parse(raw)) : blankStore(); }
+  catch(e){ return blankStore(); }
+}
+function saveStore(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(store)); }catch(e){} }
+function displayStreak(){
+  if(!store.lastPlayedISO) return 0;
+  const y = toISO(new Date(parseISO(todayISO) - MS_DAY));
+  return (store.lastPlayedISO === todayISO || store.lastPlayedISO === y) ? store.streak : 0;
+}
+
+/* ---------- State ---------- */
+const today = new Date();
+const todayISO = toISO(today);
+const todayDay = Math.max(1, dayNumberFor(today));
+let store = loadStore();
+let P = null, iso = '', dayN = 0, isToday = true, ini = [];
+let st = null;            // { placed:[cell|-1], marks:[cells], hints, locked:[actor idx], elapsed }
+let sel = -1, done = false, replay = false;
+let timerId = null, countdownId = null;
+
+const isTouch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+function softFocus(el){ if(!el || isTouch) return; try{ el.focus({ preventScroll:true }); }catch(e){} }
+function pinToTop(el){
+  if(!el) return; let f = 0;
+  const hold = () => { el.scrollTop = 0; if(++f < 8) requestAnimationFrame(hold); };
+  hold(); setTimeout(() => { el.scrollTop = 0; }, 120); setTimeout(() => { el.scrollTop = 0; }, 420);
+}
+function scrollToEl(screen, el){
+  if(!screen || !el) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const top = Math.max(0, el.offsetTop - 12);
+    try{ screen.scrollTo({ top, behavior:'smooth' }); }catch(e){ screen.scrollTop = top; }
+  }));
+}
+
+/* ---------- Landing ---------- */
+function paintLanding(){
+  $('#landingDate').textContent = longDate(today);
+  $('#statStreak').textContent = displayStreak();
+  $('#statBest').textContent = store.best;
+  $('#statSolved').textContent = store.solved;
+  const r = store.results[todayISO];
+  if(r){
+    $('#startBtn').textContent = 'Review today\u2019s puzzle';
+    $('#landingTag').textContent = 'Solved in ' + fmtTime(r.t) + '. Come back tomorrow for a new cast.';
+  }else{
+    $('#startBtn').textContent = store.progress[todayISO] ? 'Continue today' : 'Play today';
+    $('#landingTag').textContent = 'Five movies. Five actors. Put every star in their place.';
+  }
+}
+
+/* ---------- Game rendering ---------- */
+function buildBoard(){
+  const b = $('#board'); b.innerHTML = '';
+  for(let c = 0; c < N * N; c++){
+    const k = P.own[c];
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cell c' + k;
+    btn.dataset.cell = c;
+    btn.addEventListener('click', () => { if(clickSuppressed()) return; tapCell(c); });
+    btn.addEventListener('pointerdown', e => cellPointerDown(e, c));
+    b.appendChild(btn);
+  }
+  $('#legend').innerHTML = P.movies.map((m, k) =>
+    '<li><span class="sw c' + k + '"></span><span>' + esc(m.t) + ' <small>(' + m.y + ')</small></span></li>').join('');
+  $('#tray').innerHTML = P.actors.map((a, i) =>
+    '<button class="actor" type="button" data-a="' + i + '">' +
+      '<span class="av">' + esc(ini[i]) + '</span><span class="nm">' + esc(a.name) + '</span>' +
+      '<span class="where"></span><span class="key">' + (i + 1) + '</span></button>').join('');
+  document.querySelectorAll('.actor').forEach(btn =>
+    btn.addEventListener('click', () => { if(clickSuppressed()) return; selectActor(Number(btn.dataset.a)); }));
+  document.querySelectorAll('.actor').forEach(btn =>
+    btn.addEventListener('pointerdown', e => actorPointerDown(e, Number(btn.dataset.a))));
+}
+
+function conflicts(){
+  const bad = new Set(), pl = st.placed;
+  for(let a = 0; a < N; a++) for(let b = a + 1; b < N; b++){
+    if(pl[a] < 0 || pl[b] < 0) continue;
+    const ra = pl[a] / N | 0, ca = pl[a] % N, rb = pl[b] / N | 0, cb = pl[b] % N;
+    if(ra === rb || ca === cb || (Math.abs(ra - rb) <= 1 && Math.abs(ca - cb) <= 1) || P.own[pl[a]] === P.own[pl[b]]){
+      bad.add(a); bad.add(b);
+    }
+  }
+  return bad;
+}
+
+function paint(){
+  const bad = conflicts();
+  const who = new Array(N * N).fill(-1);
+  st.placed.forEach((c, a) => { if(c >= 0) who[c] = a; });
+  document.querySelectorAll('.cell').forEach(btn => {
+    const c = Number(btn.dataset.cell), a = who[c];
+    const m = P.movies[P.own[c]];
+    btn.classList.toggle('bad', a >= 0 && bad.has(a));
+    btn.classList.toggle('win', done);
+    btn.disabled = done;
+    let html = '', label = 'Row ' + (Math.floor(c / N) + 1) + ', column ' + (c % N + 1) + ', ' + m.t;
+    if(a >= 0){
+      html = '<span class="tok' + (st.locked.indexOf(a) >= 0 ? ' hint' : '') + '">' + esc(ini[a]) + '</span>';
+      label += ', ' + P.actors[a].name;
+    }else if(st.marks.indexOf(c) >= 0){
+      html = '<span class="xm">&#10005;</span>'; label += ', marked';
+    }else label += ', empty';
+    if(btn.dataset.html !== html){ btn.innerHTML = html; btn.dataset.html = html; }
+    btn.setAttribute('aria-label', label);
+    btn.title = a >= 0 ? P.actors[a].name : '';
+  });
+  document.querySelectorAll('.actor').forEach(btn => {
+    const a = Number(btn.dataset.a), c = st.placed[a];
+    btn.classList.toggle('sel', a === sel);
+    btn.classList.toggle('placed', c >= 0);
+    btn.classList.toggle('bad', bad.has(a));
+    btn.disabled = done || st.locked.indexOf(a) >= 0;
+    const w = btn.querySelector('.where');
+    w.className = 'where' + (c >= 0 ? ' c' + P.own[c] : '');
+  });
+  $('#board').classList.toggle('placing', sel >= 0 && !done);
+  $('#hintBtn').disabled = done;
+  $('#resetBtn').disabled = done;
+}
+
+function setMsg(t, good){ const m = $('#msg'); m.textContent = t || ''; m.classList.toggle('good', !!good); }
+
+/* ---------- Interaction ---------- */
+function selectActor(a){
+  if(done || st.locked.indexOf(a) >= 0) return;
+  sel = (sel === a) ? -1 : a;
+  setMsg(sel >= 0 ? 'Now tap a square for ' + P.actors[sel].name + '.' : '');
+  paint();
+}
+function tapCell(c){
+  if(done) return;
+  const occ = st.placed.indexOf(c);
+  if(sel >= 0){
+    if(occ === sel){ st.placed[sel] = -1; sel = -1; }
+    else{
+      if(occ >= 0){ if(st.locked.indexOf(occ) >= 0){ setMsg('That square was revealed by a hint.'); return; } st.placed[occ] = -1; }
+      st.placed[sel] = c;
+      const mi = st.marks.indexOf(c); if(mi >= 0) st.marks.splice(mi, 1);
+      sel = -1;
+    }
+  }else if(occ >= 0){
+    if(st.locked.indexOf(occ) >= 0){ setMsg('That actor was placed by a hint.'); return; }
+    st.placed[occ] = -1; sel = occ;            // pick them back up
+  }else{
+    const mi = st.marks.indexOf(c);
+    if(mi >= 0) st.marks.splice(mi, 1); else st.marks.push(c);
+  }
+  afterMove();
+}
+/* ---------- Drag & drop + swipe-to-mark (pointer events: mouse, touch, pen) ----------
+   - Drag an actor from the cast list onto any square to place them.
+   - Drag a placed actor to another square to move them, or off the grid to remove them.
+   - With no actor selected, press on an empty square and drag across others
+     to paint (or erase) X marks in one stroke.
+   A press that never moves past the threshold is left to the normal click
+   handler, so taps behave exactly as before. */
+const DRAG_PX = 6;
+let ptr = null;              // active gesture
+let suppressUntil = 0;
+const clickSuppressed = () => Date.now() < suppressUntil;
+function cellAt(x, y){
+  const el = document.elementFromPoint(x, y);
+  const cell = el && el.closest ? el.closest('.cell') : null;
+  return cell && $('#board').contains(cell) ? Number(cell.dataset.cell) : -1;
+}
+function actorPointerDown(e, a){
+  if(done || e.button > 0 || st.locked.indexOf(a) >= 0) return;
+  startGesture(e, { kind:'actor', actor:a, from:-1 });
+}
+function cellPointerDown(e, c){
+  if(done || e.button > 0) return;
+  const occ = st.placed.indexOf(c);
+  if(occ >= 0){
+    if(st.locked.indexOf(occ) >= 0) return;          // hinted actors stay put
+    startGesture(e, { kind:'actor', actor:occ, from:c });
+  }else if(sel < 0){
+    // Paint X marks: first square decides whether this stroke adds or erases.
+    e.preventDefault();
+    const adding = st.marks.indexOf(c) < 0;
+    startGesture(e, { kind:'mark', adding:adding, visited:[c] });
+    applyMark(c, adding);
+    paint();
+  }
+}
+function startGesture(e, g){
+  g.id = e.pointerId; g.x0 = e.clientX; g.y0 = e.clientY; g.moved = false; g.ghost = null; g.over = -1;
+  ptr = g;
+  window.addEventListener('pointermove', onPtrMove, { passive:false });
+  window.addEventListener('pointerup', onPtrUp);
+  window.addEventListener('pointercancel', onPtrCancel);
+}
+function applyMark(c, adding){
+  if(st.placed.indexOf(c) >= 0) return;
+  const i = st.marks.indexOf(c);
+  if(adding && i < 0) st.marks.push(c);
+  if(!adding && i >= 0) st.marks.splice(i, 1);
+}
+function onPtrMove(e){
+  if(!ptr || e.pointerId !== ptr.id) return;
+  const dx = e.clientX - ptr.x0, dy = e.clientY - ptr.y0;
+  if(!ptr.moved && Math.hypot(dx, dy) < DRAG_PX) return;
+  e.preventDefault();
+  if(ptr.kind === 'mark'){
+    ptr.moved = true;
+    const c = cellAt(e.clientX, e.clientY);
+    if(c >= 0 && ptr.visited.indexOf(c) < 0){ ptr.visited.push(c); applyMark(c, ptr.adding); paint(); }
+    return;
+  }
+  if(!ptr.moved){
+    ptr.moved = true;
+    sel = -1;
+    const g = document.createElement('div');
+    g.className = 'drag-ghost';
+    g.textContent = ini[ptr.actor];
+    document.body.appendChild(g);
+    ptr.ghost = g;
+    document.body.classList.add('is-dragging');
+    const src = document.querySelector('.actor[data-a="' + ptr.actor + '"]');
+    if(src) src.classList.add('dragging');
+    if(ptr.from >= 0){ const t = document.querySelector('.cell[data-cell="' + ptr.from + '"] .tok'); if(t) t.classList.add('lifted'); }
+    setMsg('Drop ' + P.actors[ptr.actor].name + ' on a square' + (ptr.from >= 0 ? ', or off the grid to remove.' : '.'));
+  }
+  const w = ptr.ghost.offsetWidth;
+  ptr.ghost.style.transform = 'translate3d(' + (e.clientX - w / 2) + 'px,' + (e.clientY - w / 2) + 'px,0)';
+  const c = cellAt(e.clientX, e.clientY);
+  if(c !== ptr.over){
+    document.querySelectorAll('.cell.drop-target').forEach(x => x.classList.remove('drop-target','drop-bad'));
+    ptr.over = c;
+    if(c >= 0){
+      const el = document.querySelector('.cell[data-cell="' + c + '"]');
+      const occ = st.placed.indexOf(c);
+      el.classList.add('drop-target');
+      if(occ >= 0 && st.locked.indexOf(occ) >= 0) el.classList.add('drop-bad');
+    }
+  }
+}
+function endGesture(){
+  window.removeEventListener('pointermove', onPtrMove);
+  window.removeEventListener('pointerup', onPtrUp);
+  window.removeEventListener('pointercancel', onPtrCancel);
+  if(ptr && ptr.ghost) ptr.ghost.remove();
+  document.body.classList.remove('is-dragging');
+  document.querySelectorAll('.cell.drop-target').forEach(x => x.classList.remove('drop-target','drop-bad'));
+  document.querySelectorAll('.actor.dragging').forEach(x => x.classList.remove('dragging'));
+  document.querySelectorAll('.tok.lifted').forEach(x => x.classList.remove('lifted'));
+  ptr = null;
+}
+function onPtrCancel(e){
+  if(!ptr || e.pointerId !== ptr.id) return;
+  const wasMark = ptr.kind === 'mark';
+  endGesture();
+  if(wasMark) afterMove(); else paint();
+}
+function onPtrUp(e){
+  if(!ptr || e.pointerId !== ptr.id) return;
+  const g = ptr;
+  if(g.kind === 'mark'){
+    suppressUntil = Date.now() + 400;            // the press already toggled the first square
+    endGesture();
+    afterMove();
+    return;
+  }
+  if(!g.moved){ endGesture(); return; }          // plain tap: let the click handler run
+  suppressUntil = Date.now() + 400;
+  const c = cellAt(e.clientX, e.clientY);
+  endGesture();
+  if(c < 0){
+    if(g.from >= 0){ st.placed[g.actor] = -1; afterMove(); }
+    else { setMsg(''); paint(); }
+    return;
+  }
+  dropActor(g.actor, c);
+}
+function dropActor(a, c){
+  const occ = st.placed.indexOf(c);
+  if(occ === a){ afterMove(); return; }
+  if(occ >= 0 && st.locked.indexOf(occ) >= 0){ paint(); setMsg('That square was revealed by a hint.'); return; }
+  const from = st.placed[a];
+  if(occ >= 0) st.placed[occ] = from;             // swap if moving between squares, else back to the cast list
+  st.placed[a] = c;
+  const mi = st.marks.indexOf(c); if(mi >= 0) st.marks.splice(mi, 1);
+  sel = -1;
+  afterMove();
+}
+function afterMove(){
+  saveProgress();
+  paint();
+  const bad = conflicts();
+  const all = st.placed.every(c => c >= 0);
+  if(bad.size) setMsg('Two actors are breaking a rule (highlighted red).');
+  else if(all){
+    const castOk = st.placed.every((c, a) => P.actors[a].films.indexOf(P.own[c]) >= 0);
+    if(castOk) win();
+    else setMsg('The grid works, but someone isn\u2019t in the movie they\u2019re standing on.');
+  }else if(sel >= 0) setMsg('Now tap a square for ' + P.actors[sel].name + '.');
+  else setMsg('');
+}
+function hint(){
+  if(done) return;
+  const a = P.actors.findIndex((_, k) => st.placed[k] !== P.solution[k]);
+  if(a < 0) return;
+  const cell = P.solution[a];
+  const occ = st.placed.indexOf(cell);
+  if(occ >= 0 && occ !== a) st.placed[occ] = -1;
+  st.placed[a] = cell;
+  const mi = st.marks.indexOf(cell); if(mi >= 0) st.marks.splice(mi, 1);
+  if(st.locked.indexOf(a) < 0) st.locked.push(a);
+  st.hints++;
+  if(sel === a) sel = -1;
+  afterMove();
+  if(!done) setMsg(P.actors[a].name + ' belongs in ' + P.movies[P.own[cell]].t + '.', true);
+}
+function clearBoard(){
+  if(done) return;
+  st.placed = st.placed.map((c, a) => st.locked.indexOf(a) >= 0 ? c : -1);
+  st.marks = []; sel = -1;
+  afterMove();
+}
+
+/* ---------- Progress / results ---------- */
+const freshState = () => ({ placed:[-1,-1,-1,-1,-1], marks:[], hints:0, locked:[], elapsed:0 });
+function saveProgress(){
+  if(replay || store.results[iso]) return;
+  store.progress[iso] = st; saveStore();
+}
+function recordWin(){
+  if(store.results[iso]) return;
+  if(isToday){
+    const y = toISO(new Date(parseISO(iso) - MS_DAY));
+    store.streak = (store.lastPlayedISO === y && store.streak > 0) ? store.streak + 1 : 1;
+    store.best = Math.max(store.best, store.streak);
+    store.lastPlayedISO = iso;
+  }
+  store.solved++;
+  store.results[iso] = { t: st.elapsed, h: st.hints, archive: !isToday };
+  delete store.progress[iso];
+  saveStore();
+}
+
+function startTimer(){
+  clearInterval(timerId);
+  $('#timer').textContent = fmtTime(st.elapsed);
+  timerId = setInterval(() => {
+    if(document.hidden) return;
+    st.elapsed++;
+    $('#timer').textContent = fmtTime(st.elapsed);
+    if(st.elapsed % 5 === 0) saveProgress();
+  }, 1000);
+}
+
+function win(){
+  done = true; sel = -1;
+  clearInterval(timerId);
+  if(!replay) recordWin();
+  setMsg('');
+  paint();
+  renderSolution();
+  scrollToEl($('#game'), $('#solutionSlot'));
+}
+
+function renderSolution(){
+  const res = store.results[iso];
+  const time = replay ? st.elapsed : res.t, hints = replay ? st.hints : res.h;
+  const castHtml = P.actors.map((a, i) => {
+    const k = P.own[P.solution[i]], m = P.movies[k];
+    const also = a.films.filter(f => f !== k).map(f => P.movies[f].t);
+    return '<li><span class="sw c' + k + '"></span><span><b>' + esc(a.name) + '</b> \u2014 ' + esc(m.t) +
+      ' (' + m.y + ', ' + esc(m.s) + ')' + (also.length ? '<em>Also in today\u2019s line-up: ' + esc(also.join(', ')) + '</em>' : '') +
+      '</span></li>';
+  }).join('');
+  const banner = replay ? 'Replay \u00B7 your original result is kept'
+    : isToday ? '\u{1F525} Streak: ' + displayStreak() + (displayStreak() === 1 ? ' day' : ' days') + ' \u00B7 Solved ' + store.solved
+    : '\u{1F5C3} Archive puzzle \u00B7 streak untouched \u00B7 Solved ' + store.solved;
+  $('#solutionSlot').innerHTML =
+    '<section class="solution">' +
+      '<p class="verdict-line">That\u2019s a wrap!</p>' +
+      '<p class="sub">Solved in ' + fmtTime(time) + ' \u00B7 ' + (hints ? hints + (hints === 1 ? ' hint' : ' hints') : 'no hints') + '</p>' +
+      '<h4>Today\u2019s cast</h4><ul class="cast">' + castHtml + '</ul>' +
+      '<div class="streak-banner">' + banner + '</div>' +
+      '<div class="actions">' +
+        '<button id="shareBtn" class="btn" type="button">Share result</button>' +
+        '<button id="againBtn" class="btn" type="button">Play again</button>' +
+        '<button id="archiveBtn" class="btn" type="button">Previous days</button>' +
+        '<button id="homeBtn" class="btn primary" type="button">Back home</button>' +
+      '</div>' +
+      (isToday ? '<p class="next-in">Next puzzle in <span id="countdown">--:--:--</span></p>'
+               : '<p class="next-in">Day ' + String(dayN).padStart(3,'0') + ' complete</p>') +
+    '</section>';
+  $('#shareBtn').addEventListener('click', share);
+  $('#againBtn').addEventListener('click', playAgain);
+  $('#archiveBtn').addEventListener('click', () => openArchive('game'));
+  $('#homeBtn').addEventListener('click', goHome);
+  if(isToday) startCountdown();
+}
+
+function playAgain(){
+  replay = true; done = false; sel = -1;
+  st = freshState();
+  $('#solutionSlot').innerHTML = '';
+  setMsg('Replay \u2014 this won\u2019t change your stats.', true);
+  paint(); startTimer();
+  pinToTop($('#game'));
+}
+
+/* ---------- Share (secure-context aware, with fallbacks) ---------- */
+function resultText(day, puzzle, res){
+  let grid = '';
+  for(let r = 0; r < N; r++){ for(let c = 0; c < N; c++) grid += EMOJI[puzzle.own[r * N + c]]; grid += '\n'; }
+  return 'Universal Blockbuster #' + day + '\n\u{1F3AC} Solved in ' + fmtTime(res.t) + ' \u00B7 ' +
+    (res.h ? res.h + ' hint' + (res.h > 1 ? 's' : '') : 'no hints') + '\n' + grid.trim();
+}
+async function sendShare(text, btnId, label){
+  const isWeb = location.protocol === 'http:' || location.protocol === 'https:';
+  const payload = isWeb ? text + '\n' + location.href : text;
+  if(navigator.share && isWeb){
+    try{ await navigator.share({ title:'Universal Blockbuster', text, url:location.href }); return; }
+    catch(err){ if(err.name === 'AbortError') return; }
+  }
+  if(navigator.clipboard && window.isSecureContext){
+    try{ await navigator.clipboard.writeText(payload); flash(btnId, label); return; }catch(e){}
+  }
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = payload; ta.setAttribute('readonly','');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, payload.length);
+    const ok = document.execCommand('copy'); document.body.removeChild(ta);
+    if(ok){ flash(btnId, label); return; }
+  }catch(e){}
+  window.prompt('Copy and share:', payload);
+}
+function share(){
+  const res = store.results[iso]; if(!res) return;
+  sendShare(resultText(dayN, P, res), '#shareBtn', 'Share result');
+}
+/* Landing page: shares today's result if solved, otherwise an invite to play */
+function shareLanding(){
+  const res = store.results[todayISO];
+  const streak = displayStreak();
+  const text = res
+    ? resultText(todayDay, puzzleForDay(todayDay), res) + (streak ? '\n\u{1F525} Streak: ' + streak : '')
+    : '\u{1F3AC} Universal Blockbuster #' + todayDay + '\nFive movies. Five actors. Can you put every star in their place?' +
+      (streak ? '\n\u{1F525} My streak: ' + streak : '');
+  sendShare(text, '#landingShareBtn', 'Share');
+}
+function flash(btnId, label){
+  const b = $(btnId); if(!b) return;
+  b.textContent = 'Copied!';
+  setTimeout(() => { const s = $(btnId); if(s) s.textContent = label; }, 2500);
+}
+
+function startCountdown(){
+  clearInterval(countdownId);
+  const tick = () => {
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
+    const d = Math.max(0, next - now.getTime());
+    const el = $('#countdown');
+    if(el) el.textContent = [Math.floor(d / 3600000), Math.floor(d % 3600000 / 60000), Math.floor(d % 60000 / 1000)]
+      .map(n => String(n).padStart(2,'0')).join(':');
+  };
+  tick(); countdownId = setInterval(tick, 1000);
+}
+
+/* ---------- Screens ---------- */
+function show(id){
+  ['landing','game','archive'].forEach(s => {
+    const el = document.getElementById(s);
+    if(s === id){ el.classList.remove('hidden-left','hidden-right'); }
+    else if(!el.classList.contains('hidden-left') && !el.classList.contains('hidden-right')){
+      el.classList.add(s === 'landing' ? 'hidden-left' : 'hidden-right');
+    }
+  });
+  pinToTop(document.getElementById(id));
+}
+
+function openDay(n){
+  if(ptr) endGesture();
+  clearInterval(countdownId); clearInterval(timerId);
+  dayN = n; iso = isoForDay(n); isToday = (n === todayDay);
+  P = puzzleForDay(n);
+  ini = initialsFor(P.actors.map(a => a.name));
+  sel = -1; replay = false;
+  $('#dayNo').textContent = 'Day ' + String(n).padStart(3,'0') + ' \u00B7 ' +
+    dateForDay(n).toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' });
+  const flag = $('#archiveFlag');
+  flag.classList.toggle('on', !isToday);
+  flag.textContent = isToday ? '' : '\u{1F5C3} From the archive \u00B7 ' + longDate(dateForDay(n)) + ' \u00B7 does not affect your streak';
+  buildBoard();
+  $('#solutionSlot').innerHTML = '';
+  setMsg('');
+  const res = store.results[iso];
+  if(res){
+    done = true;
+    st = freshState(); st.placed = P.solution.slice(); st.elapsed = res.t; st.hints = res.h;
+    $('#timer').textContent = fmtTime(res.t);
+    paint(); renderSolution();
+  }else{
+    done = false;
+    const saved = store.progress[iso];
+    st = saved ? Object.assign(freshState(), saved) : freshState();
+    paint(); startTimer();
+  }
+  show('game');
+  setTimeout(() => softFocus(document.querySelector('.actor:not(:disabled)')), 500);
+}
+
+function buildArchive(){
+  const cards = []; let solved = 0, prog = 0, open = 0;
+  for(let n = todayDay; n >= 1; n--){
+    const d = isoForDay(n), p = puzzleForDay(n), res = store.results[d], pr = store.progress[d];
+    const isT = n === todayDay;
+    let cls, label;
+    if(res){ solved++; cls = 'solved'; label = 'Solved \u00B7 ' + fmtTime(res.t); }
+    else if(pr){ prog++; cls = 'progress'; label = isT ? 'Today \u00B7 in progress' : 'In progress'; }
+    else if(isT){ open++; cls = 'today'; label = 'Today\u2019s puzzle'; }
+    else{ open++; cls = 'unplayed'; label = 'Unplayed \u00B7 play now'; }
+    cards.push('<button class="day-card' + (isT ? ' is-today' : '') + '" type="button" data-day="' + n + '">' +
+      '<span class="dc-no">Day ' + String(n).padStart(3,'0') + ' \u00B7 ' +
+        esc(dateForDay(n).toLocaleDateString(undefined, { day:'numeric', month:'short', year:'numeric' })) + '</span>' +
+      '<span class="dc-sw">' + p.movies.map((_, k) => '<span class="c' + k + '"></span>').join('') + '</span>' +
+      '<span class="dc-films">' + esc(p.movies.map(m => m.t).join(' \u00B7 ')) + '</span>' +
+      '<span class="dc-status ' + cls + '">' + label + '</span></button>');
+  }
+  $('#archiveGrid').innerHTML = cards.join('');
+  $('#arcSolved').textContent = solved; $('#arcProgress').textContent = prog; $('#arcOpen').textContent = open;
+  document.querySelectorAll('.day-card').forEach(b => b.addEventListener('click', () => openDay(Number(b.dataset.day))));
+}
+function openArchive(){
+  clearInterval(countdownId); clearInterval(timerId);
+  if(st && !done) saveProgress();
+  buildArchive(); show('archive');
+  setTimeout(() => softFocus(document.querySelector('.day-card')), 500);
+}
+function goHome(){
+  clearInterval(countdownId); clearInterval(timerId);
+  if(st && !done) saveProgress();
+  paintLanding(); show('landing');
+  setTimeout(() => softFocus($('#startBtn')), 450);
+}
+
+/* ---------- Background video: keep it running, hide on failure ---------- */
+const bgv = $('#bgVideo');
+function kickVideo(){
+  if(!bgv || bgv.classList.contains('failed')) return;
+  bgv.muted = true;
+  if(bgv.paused){ const p = bgv.play(); if(p && p.catch) p.catch(() => {}); }
+}
+bgv.addEventListener('error', () => bgv.classList.add('failed'), true);
+['loadedmetadata','canplay','stalled','pause'].forEach(e => bgv.addEventListener(e, kickVideo));
+document.addEventListener('visibilitychange', () => { if(!document.hidden) kickVideo(); });
+['pointerdown','touchstart','keydown'].forEach(e => window.addEventListener(e, kickVideo, { passive:true }));
+kickVideo();
+
+/* ---------- Keyboard / TV remote ---------- */
+document.addEventListener('keydown', e => {
+  const gameOn = !$('#game').classList.contains('hidden-right') && !$('#game').classList.contains('hidden-left');
+  const ae = document.activeElement;
+  if(gameOn && !done){
+    if(/^[1-5]$/.test(e.key)){ selectActor(Number(e.key) - 1); return; }
+    if(e.key === 'Escape'){ sel = -1; setMsg(''); paint(); return; }
+    if((e.key === 'Backspace' || e.key === 'Delete') && ae && ae.dataset && ae.dataset.cell){
+      const c = Number(ae.dataset.cell), occ = st.placed.indexOf(c);
+      if(occ >= 0 && st.locked.indexOf(occ) < 0){ st.placed[occ] = -1; afterMove(); }
+      e.preventDefault(); return;
+    }
+  }
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.key) === -1) return;
+  // 2D movement inside the grid
+  if(ae && ae.dataset && ae.dataset.cell !== undefined){
+    const c = Number(ae.dataset.cell), r = c / N | 0, col = c % N;
+    let nr = r, nc = col;
+    if(e.key === 'ArrowUp') nr--; if(e.key === 'ArrowDown') nr++;
+    if(e.key === 'ArrowLeft') nc--; if(e.key === 'ArrowRight') nc++;
+    if(nr >= 0 && nr < N && nc >= 0 && nc < N){
+      e.preventDefault();
+      const t = document.querySelector('.cell[data-cell="' + (nr * N + nc) + '"]');
+      try{ t.focus({ preventScroll:true }); }catch(err){ t.focus(); }
+      if(t.scrollIntoView) t.scrollIntoView({ block:'nearest', behavior:'smooth' });
+      return;
+    }
+  }
+  const list = [].slice.call(document.querySelectorAll(
+    '.screen:not(.hidden-left):not(.hidden-right) button:not(:disabled)'));
+  if(!list.length) return;
+  e.preventDefault();
+  const i = list.indexOf(ae);
+  const fwd = e.key === 'ArrowDown' || e.key === 'ArrowRight';
+  const next = i === -1 ? list[0] : list[(i + (fwd ? 1 : -1) + list.length) % list.length];
+  try{ next.focus({ preventScroll:true }); }catch(err){ next.focus(); }
+  if(next.scrollIntoView) next.scrollIntoView({ block:'nearest', behavior:'smooth' });
+});
+
+/* Save the clock if the tab is closed or backgrounded mid-puzzle */
+document.addEventListener('visibilitychange', () => { if(document.hidden && st && !done) saveProgress(); });
+window.addEventListener('pagehide', () => { if(st && !done) saveProgress(); });
+
+/* ---------- Boot ---------- */
+$('#year').textContent = today.getFullYear();
+$('#startBtn').addEventListener('click', () => openDay(todayDay));
+$('#landingArchiveBtn').addEventListener('click', () => openArchive());
+$('#landingShareBtn').addEventListener('click', shareLanding);
+$('#arcHomeBtn').addEventListener('click', goHome);
+$('#gameHomeBtn').addEventListener('click', goHome);
+$('#hintBtn').addEventListener('click', hint);
+$('#resetBtn').addEventListener('click', clearBoard);
+function hideLoader(){ $('#loader').classList.add('hide'); setTimeout(() => softFocus($('#startBtn')), 400); }
+try{ puzzleForDay(todayDay); paintLanding(); }catch(err){ console.error(err); }
+setTimeout(hideLoader, 450);
+</script>
+</body>
+</html>
